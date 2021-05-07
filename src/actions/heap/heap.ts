@@ -65,7 +65,8 @@ export class HeapAction extends Hub.Action {
     ) {
       throw new Error("Column mapping to a Heap field must be provided.")
     }
-    const heapFieldName: string = request.formParams.heap_field
+    const heapFieldLabel: string = request.formParams.heap_field
+    let heapFieldName: string
 
     let fieldMap: LookerFieldMap = {} as LookerFieldMap
     const heapField = this.resolveHeapField(propertyType)
@@ -76,7 +77,7 @@ export class HeapAction extends Hub.Action {
     await request.streamJsonDetail({
       onFields: (fieldset) => {
         const allFields = Hub.allFields(fieldset)
-        this.validateHeapFieldExistence(allFields, heapFieldName)
+        heapFieldName = this.extractHeapFieldName(allFields, heapFieldLabel)
         fieldMap = this.extractFieldMap(allFields)
       },
       // :TODO: possibly optimize by batching rows and calling the bulk endpoint
@@ -85,6 +86,7 @@ export class HeapAction extends Hub.Action {
           const { heapFieldValue, properties } = this.extractPropertiesFromRow(
             row,
             heapFieldName,
+            heapFieldLabel,
             fieldMap,
           )
           const requestBody = Object.assign({}, baseRequestBody, {
@@ -123,7 +125,7 @@ export class HeapAction extends Hub.Action {
         type: "select",
       },
       {
-        label: "Heap Field (identity or account_id field)",
+        label: "Heap Field Label (identity or account_id field)",
         name: "heap_field",
         required: true,
         type: "string",
@@ -132,16 +134,17 @@ export class HeapAction extends Hub.Action {
     return form
   }
 
-  private validateHeapFieldExistence(
+  private extractHeapFieldName(
     fields: Hub.Field[],
-    heapFieldName: string,
+    heapFieldLabel: string,
   ) {
-    const heapFields = fields.filter((field) => field.name === heapFieldName)
+    const heapFields = fields.filter((field) => field.label === heapFieldLabel)
     if (heapFields.length !== 1) {
       throw new Error(
-        `Heap field (${heapFieldName}) is missing in the query result.`,
+        `Heap field (${heapFieldLabel}) is missing in the query result.`,
       )
     }
+    return heapFields[0].name
   }
 
   private extractFieldMap(allFields: Hub.Field[]): LookerFieldMap {
@@ -177,14 +180,15 @@ export class HeapAction extends Hub.Action {
   private extractPropertiesFromRow(
     row: Hub.JsonDetail.Row,
     heapFieldName: string,
+    heapFieldLabel: string,
     allFieldMap: LookerFieldMap,
   ): { heapFieldValue: string; properties: { [K in string]: string } } {
     if (!row.hasOwnProperty(heapFieldName)) {
-      throw new Error(`Found a row without the ${heapFieldName} field`)
+      throw new Error(`Found a row without the ${heapFieldLabel} field`)
     }
     const heapFieldValue = row[heapFieldName].value.toString()
     if (heapFieldValue === "") {
-      throw new Error(`Found a row with an empty ${heapFieldName} field.`)
+      throw new Error(`Found a row with an empty ${heapFieldLabel} field.`)
     }
 
     const properties: { [K in string]: string } = {}

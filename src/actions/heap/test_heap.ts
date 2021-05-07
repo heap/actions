@@ -25,7 +25,7 @@ describe(`${action.constructor.name} unit tests`, () => {
 
   const buildRequest = (
     propertyType: HeapPropertyType,
-    heapFieldName: string,
+    heapFieldLabel: string,
     fields: { name: string; label: string }[],
     data: { [K in string]: { value: any } }[],
   ): Hub.ActionRequest => {
@@ -33,7 +33,7 @@ describe(`${action.constructor.name} unit tests`, () => {
     request.type = Hub.ActionType.Query
     request.params = { heap_env_id: ENV_ID }
     request.formParams = {
-      heap_field: heapFieldName,
+      heap_field: heapFieldLabel,
       property_type: propertyType,
     }
     request.attachment = {
@@ -67,7 +67,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const data = [{ email: { value: "value1" } }]
       const request = buildRequest(
         HeapPropertyTypes.User,
-        "email",
+        "Email",
         fields,
         data,
       )
@@ -95,7 +95,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const data = [{ email: { value: "value1" } }]
       const request = buildRequest(
         "unsupported" as HeapPropertyType,
-        "email",
+        "Email",
         fields,
         data,
       )
@@ -107,11 +107,11 @@ describe(`${action.constructor.name} unit tests`, () => {
     })
 
     it("should throw when Heap field is missing", async () => {
-      const fields = [{ name: "name", label: "Email" }]
+      const fields = [{ name: "name", label: "label" }]
       const data = [{ name: { value: "value1" } }]
       const request = buildRequest(
         HeapPropertyTypes.User,
-        "email",
+        "Email",
         fields,
         data,
       )
@@ -119,7 +119,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       chai
         .expect(action.validateAndExecute(request))
         .to.be.eventually.rejectedWith(
-          "Heap field (email) is missing in the query result.",
+          "Heap field (Email) is missing in the query result.",
         )
       chai.expect(stubPost).to.have.not.been.called
     })
@@ -129,7 +129,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const data = [{ email: { value: "" } }]
       const request = buildRequest(
         HeapPropertyTypes.User,
-        "email",
+        "Email",
         fields,
         data,
       )
@@ -139,7 +139,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       chai.expect(response.success).to.equal(false)
       chai
         .expect(response.message)
-        .to.match(new RegExp("Found a row with an empty email field"))
+        .to.match(new RegExp("Found a row with an empty Email field"))
       chai.expect(stubPost).to.have.not.been.called
     })
   })
@@ -165,7 +165,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       ]
       const request = buildRequest(
         HeapPropertyTypes.User,
-        "email",
+        "Email",
         fields,
         data,
       )
@@ -216,7 +216,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       ]
       const request = buildRequest(
         HeapPropertyTypes.Account,
-        "account ID",
+        "Account ID",
         fields,
         data,
       )
@@ -262,7 +262,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       ]
       const request = buildRequest(
         HeapPropertyTypes.Account,
-        "account ID",
+        "Account ID",
         fields,
         data,
       )
