@@ -125,7 +125,7 @@ export class HeapAction extends Hub.Action {
         type: "select",
       },
       {
-        label: "Heap Field Label (identity or account_id field)",
+        label: "Column name matching user join key or account ID property in Heap",
         name: "heap_field",
         required: true,
         type: "string",
