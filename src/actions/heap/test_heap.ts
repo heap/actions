@@ -26,8 +26,8 @@ describe(`${action.constructor.name} unit tests`, () => {
   const buildRequest = (
     propertyType: HeapPropertyType,
     heapFieldName: string,
-    fields: { name: string, label: string }[],
-    data: { [K in string]: { value: string } }[],
+    fields: { name: string; label: string }[],
+    data: { [K in string]: { value: any } }[],
   ): Hub.ActionRequest => {
     const request = new Hub.ActionRequest()
     request.type = Hub.ActionType.Query
@@ -46,7 +46,7 @@ describe(`${action.constructor.name} unit tests`, () => {
 
   const expectRequestSent = (
     url: string,
-    properties: { [K in string]: string },
+    properties: { [K in string]: string | number },
     heapTag: HeapField,
     heapTagValue: string,
   ) => {
@@ -200,7 +200,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const fields = [
         { name: "property1", label: "Property 1" },
         { name: "property2", label: "Property 2" },
-        { name: "account ID", tags: ["account_id"], label: "Account ID"},
+        { name: "account ID", tags: ["account_id"], label: "Account ID" },
       ]
       const data = [
         {
@@ -242,6 +242,41 @@ describe(`${action.constructor.name} unit tests`, () => {
         },
         HeapFields.AccountId,
         "accountB",
+      )
+    })
+  })
+
+  describe("Common Processing", () => {
+    it("should send properties with correct types", async () => {
+      const fields = [
+        { name: "property1", label: "Property 1", is_numeric: true },
+        { name: "property2", label: "Property 2", is_numeric: false },
+        { name: "account ID", tags: ["account_id"], label: "Account ID" },
+      ]
+      const data = [
+        {
+          "property1": { value: 1 },
+          "property2": { value: "value2" },
+          "account ID": { value: "account" },
+        },
+      ]
+      const request = buildRequest(
+        HeapPropertyTypes.Account,
+        "account ID",
+        fields,
+        data,
+      )
+
+      await action.validateAndExecute(request)
+
+      expectRequestSent(
+        HeapAction.ADD_ACCOUNT_PROPERTIES_URL,
+        {
+          "Looker Property 1": 1,
+          "Looker Property 2": "value2",
+        },
+        HeapFields.AccountId,
+        "account",
       )
     })
   })

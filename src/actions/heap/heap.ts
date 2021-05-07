@@ -20,7 +20,7 @@ export enum HeapFields {
 
 export type HeapField = HeapFields.Identity | HeapFields.AccountId
 
-type LookerFieldMap = { [fieldName: string]: Hub.Field };
+interface LookerFieldMap { [fieldName: string]: Hub.Field }
 
 export class HeapAction extends Hub.Action {
   static ADD_USER_PROPERTIES_URL =
@@ -67,7 +67,7 @@ export class HeapAction extends Hub.Action {
     }
     const heapFieldName: string = request.formParams.heap_field
 
-    let fieldMap: LookerFieldMap = {} as LookerFieldMap;
+    let fieldMap: LookerFieldMap = {} as LookerFieldMap
     const heapField = this.resolveHeapField(propertyType)
     const requestUrl = this.resolveApiEndpoint(propertyType)
     const baseRequestBody = { app_id: request.params.heap_env_id }
@@ -75,9 +75,9 @@ export class HeapAction extends Hub.Action {
 
     await request.streamJsonDetail({
       onFields: (fieldset) => {
-        const allFields = Hub.allFields(fieldset);
-        this.validateHeapFieldExistence(allFields, heapFieldName);
-        fieldMap = this.extractFieldMap(allFields);
+        const allFields = Hub.allFields(fieldset)
+        this.validateHeapFieldExistence(allFields, heapFieldName)
+        fieldMap = this.extractFieldMap(allFields)
       },
       // :TODO: possibly optimize by batching rows and calling the bulk endpoint
       onRow: (row) => {
@@ -190,13 +190,15 @@ export class HeapAction extends Hub.Action {
     const properties: { [K in string]: string } = {}
     for (const [fieldName, cell] of Object.entries(row)) {
       if (fieldName !== heapFieldName) {
+        const field = allFieldMap[fieldName]
         // Field labels are the original name of the property that has not been sanitized or snake-cased.
-        const fieldLabel = allFieldMap[fieldName].label !== undefined ? allFieldMap[fieldName].label : fieldName
+        const fieldLabel = field.label !== undefined ? field.label : fieldName
         const lookerPropertyName = "Looker " + fieldLabel
         // :TODO: what are and how to handle PivotCells?
-        properties[lookerPropertyName] = cell.value
-          .toString()
-          .substring(0, 1024)
+        const value = field.is_numeric
+          ? +cell.value
+          : cell.value.toString().substring(0, 1024)
+        properties[lookerPropertyName] = value
       }
     }
     return { properties, heapFieldValue }
