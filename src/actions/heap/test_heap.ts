@@ -145,9 +145,9 @@ describe(`${action.constructor.name} unit tests`, () => {
       chai.expect(stubPost).to.have.not.been.called
     })
 
-    it("should fail when Heap field is empty in a row", async () => {
+    it("should skip rows with null heap field", async () => {
       const fields = [{ name: "email", label: "Email" }]
-      const data = [{ email: { value: "" } }]
+      const data = [{ email: { value: null } }]
       const request = buildRequest(
         HeapPropertyTypes.User,
         "Email",
@@ -157,10 +157,7 @@ describe(`${action.constructor.name} unit tests`, () => {
 
       const response = await action.validateAndExecute(request)
 
-      chai.expect(response.success).to.equal(false)
-      chai
-        .expect(response.message)
-        .to.match(new RegExp("Found a row with an empty Email field"))
+      chai.expect(response.success).to.equal(true)
       chai.expect(stubPost).to.have.not.been.called
     })
   })
