@@ -128,6 +128,7 @@ export class HeapAction extends Hub.Action {
                 request.params.heap_env_id!,
                 requestUrl,
                 heapField,
+                errors,
               ),
             )
             requestBatch = []
@@ -145,6 +146,7 @@ export class HeapAction extends Hub.Action {
           request.params.heap_env_id!,
           requestUrl,
           heapField,
+          errors,
         ),
       )
     }
@@ -155,12 +157,17 @@ export class HeapAction extends Hub.Action {
       errors.push(err)
     }
 
-    await this.trackLookerAction(
-      request.params.heap_env_id!,
-      requestCount,
-      heapField,
-      errors.length === 0 ? "success" : "failure",
-    )
+    try {
+      await this.trackLookerAction(
+        request.params.heap_env_id!,
+        requestCount,
+        heapField,
+        errors.length === 0 ? "success" : "failure",
+      )
+    } catch (err) {
+      // swallow internal track call error
+    }
+
     if (errors.length === 0) {
       return new Hub.ActionResponse({ success: true })
     }
@@ -296,19 +303,24 @@ export class HeapAction extends Hub.Action {
     envId: string,
     requestUrl: string,
     heapField: HeapField,
+    errors: Error[],
   ): Promise<void> {
     const requestBody = this.constructBodyForRequest(
       envId,
       heapField,
       requestBatch,
     )
-    await req
-      .post({
-        uri: requestUrl,
-        headers: { "Content-Type": "application/json" },
-        body: requestBody,
-      })
-      .promise()
+    try {
+      await req
+        .post({
+          uri: requestUrl,
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+        })
+        .promise()
+    } catch (err) {
+      errors.push(err)
+    }
   }
 
   /**
