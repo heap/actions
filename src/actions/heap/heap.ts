@@ -113,7 +113,6 @@ export class HeapAction extends Hub.Action {
       onRow: (row) => {
         try {
           const { heapFieldValue, properties } = this.extractPropertiesFromRow(
-            request.params.heap_env_id!,
             row,
             heapFieldName,
             heapFieldLabel,
@@ -255,7 +254,6 @@ export class HeapAction extends Hub.Action {
   }
 
   private extractPropertiesFromRow(
-    appId: string,
     row: Hub.JsonDetail.Row,
     heapFieldName: string,
     heapFieldLabel: string,
@@ -274,9 +272,6 @@ export class HeapAction extends Hub.Action {
 
     const properties: { [K in string]: string } = {}
     for (const [fieldName, cell] of Object.entries(row)) {
-      if (appId === HeapAction.HEAP_ENV_ID) {
-        winston.info("HoH field", fieldName, cell)
-      }
       if (fieldName !== heapFieldName) {
         const field = allFieldMap[fieldName]
         // Field labels are the original name of the property that has not been sanitized or snake-cased.
