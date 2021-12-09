@@ -313,9 +313,6 @@ export class HeapAction extends Hub.Action {
         })),
       }
     }
-    if (appId === HeapAction.HEAP_ENV_ID) {
-      winston.info("HoH request", jsonBody)
-    }
     return JSON.stringify(Object.assign({}, baseRequestBody, jsonBody))
   }
 
