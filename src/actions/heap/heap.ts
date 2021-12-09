@@ -277,8 +277,8 @@ export class HeapAction extends Hub.Action {
         // Field labels are the original name of the property that has not been sanitized or snake-cased.
         const propertyName =
           field.label !== undefined ? field.label : fieldName
-        const cellValue = cell.value ? cell.value : cell.filterable_value
-        if (cellValue) {
+        const cellValue = !!cell.value ? cell.value : cell.filterable_value
+        if (!!cellValue) {
           const propertyValue = cellValue.toString().substring(0, 1024)
           // Certain number formats are displayed with commas
           const sanitizedPropertyValue = field.is_numeric
