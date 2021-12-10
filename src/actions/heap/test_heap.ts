@@ -91,6 +91,7 @@ describe(`${action.constructor.name} unit tests`, () => {
 
   const expectHeapTrackRequest = (
     heapField: HeapField,
+    heapFieldLabel: string,
     recordCount: number,
     state: "success" | "failure",
     numCall: number,
@@ -111,6 +112,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         customer_env_id: ENV_ID,
         record_count: recordCount,
         field_type: heapField,
+        join_key: heapFieldLabel,
         state,
       },
     })
@@ -193,7 +195,7 @@ describe(`${action.constructor.name} unit tests`, () => {
 
       chai.expect(response.success).to.equal(true)
       chai.expect(stubPost).to.have.been.calledOnce
-      expectHeapTrackRequest(HeapFields.Identity, 0, "success", 0)
+      expectHeapTrackRequest(HeapFields.Identity, "Email", 0, "success", 0)
     })
   })
 
@@ -243,7 +245,7 @@ describe(`${action.constructor.name} unit tests`, () => {
           heapIdentity: "testB@heap.io",
         },
       ])
-      expectHeapTrackRequest(HeapFields.Identity, 2, "success", 1)
+      expectHeapTrackRequest(HeapFields.Identity, "Email", 2, "success", 1)
     })
   })
 
@@ -293,7 +295,7 @@ describe(`${action.constructor.name} unit tests`, () => {
           heapAccountId: "accountB",
         },
       ])
-      expectHeapTrackRequest(HeapFields.AccountId, 2, "success", 1)
+      expectHeapTrackRequest(HeapFields.AccountId, "Account ID", 2, "success", 1)
     })
   })
 
@@ -370,7 +372,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         })),
         1,
       )
-      expectHeapTrackRequest(HeapFields.AccountId, requestCount, "success", 2)
+      expectHeapTrackRequest(HeapFields.AccountId, "Account ID", requestCount, "success", 2)
     })
 
     it("should catch rejected request promises", async () => {

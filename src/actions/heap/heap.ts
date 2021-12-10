@@ -172,6 +172,7 @@ export class HeapAction extends Hub.Action {
         request.params.heap_env_id!,
         rowCount,
         heapField,
+        heapFieldLabel,
         errors.length === 0 ? "success" : "failure",
       )
     } catch (err) {
@@ -352,6 +353,7 @@ export class HeapAction extends Hub.Action {
     envId: string,
     recordCount: number,
     heapField: HeapField,
+    heapFieldLabel: string,
     state: "success" | "failure",
   ): Promise<void> {
     const now = new Date().toISOString()
@@ -364,6 +366,7 @@ export class HeapAction extends Hub.Action {
         customer_env_id: envId,
         record_count: recordCount,
         field_type: heapField,
+        join_key: heapFieldLabel,
         state,
       },
     }
