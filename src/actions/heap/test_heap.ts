@@ -347,7 +347,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         data,
       )
 
-      await action.validateAndExecute(request)
+      const response = await action.validateAndExecute(request)
 
       expectAddAccountPropertyRequest([
         {
@@ -358,6 +358,8 @@ describe(`${action.constructor.name} unit tests`, () => {
           heapAccountId: "account",
         },
       ])
+      chai.expect(response.success).to.equal(true)
+      chai.expect(stubPost).to.have.been.calledTwice
     })
 
     it("should correctly batch rows", async () => {

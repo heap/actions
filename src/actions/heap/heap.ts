@@ -39,6 +39,13 @@ interface HeapEntity {
   properties: PropertyMap
 }
 
+function getErrorMessage(error: unknown) {
+  if (!error || !(error as Error).message) {
+    return '';
+  }
+  return (error as Error).message;
+}
+
 export class HeapAction extends Hub.Action {
   static ADD_USER_PROPERTIES_URL =
     "https://heapanalytics.com/api/integrations/add_user_properties"
@@ -68,7 +75,8 @@ export class HeapAction extends Hub.Action {
     const maybeValidationError = this.validateParams(request.formParams)
     if (!!maybeValidationError) {
       winston.error(
-        `Heap action for envId failed with errors: ${maybeValidationError.message}`,
+        `Heap action failed with an error: ${maybeValidationError.message}`,
+        request.formParams,
       )
       return new Hub.ActionResponse({
         success: false,
@@ -146,7 +154,7 @@ export class HeapAction extends Hub.Action {
             }
           }
         } catch (err) {
-          errors.push(new Error("Encountered an error onRow, error: " + JSON.stringify(err)))
+          errors.push(new Error("Encountered an error onRow, error: " + getErrorMessage(err)))
         }
       },
     })
@@ -156,7 +164,7 @@ export class HeapAction extends Hub.Action {
       winston.info(`Confirming all ${length} requests are resolved`, logTag)
       await Promise.all(requestPromises)
     } catch (err) {
-      errors.push(new Error("Encountered an error in execute, error: " + JSON.stringify(err)))
+      errors.push(new Error("Encountered an error in execute, error: " + getErrorMessage(err)))
     }
 
     if (requestBatch.length > 0) {
@@ -173,7 +181,10 @@ export class HeapAction extends Hub.Action {
         errors.length === 0 ? "success" : "failure",
       )
     } catch (err) {
-      winston.warn("Heap track call failed.", logTag)
+      winston.warn("Heap track call failed.", {
+        ...logTag,
+        error: getErrorMessage(err),
+      })
       // swallow internal track call error
     }
 
@@ -349,10 +360,10 @@ export class HeapAction extends Hub.Action {
         key: "",
         value: "",
         success: false,
-        error: `Found a row without the ${heapFieldDesc} field or value on the field is empty. ` + 
+        error: `Found a row without the ${heapFieldDesc} field or value on the field is empty. ` +
           `row: ${JSON.stringify(row)}`,
       }
-   }
+    }
   }
 
   /*
@@ -397,7 +408,7 @@ export class HeapAction extends Hub.Action {
     } catch (err) {
       winston.error("Encountered an error in heapify, skip the row", {
         ...logTag,
-        err,
+        error: getErrorMessage(err),
         row,
       })
       return this.emptyHeapEntity
@@ -450,7 +461,7 @@ export class HeapAction extends Hub.Action {
         })
         .promise()
     } catch (err) {
-      errors.push(new Error("Encountered an error in sending request to heap, error: " + JSON.stringify(err)))
+      errors.push(new Error("Encountered an error in sending request to heap, error: " + getErrorMessage(err)))
    }
   }
 
@@ -490,6 +501,7 @@ export class HeapAction extends Hub.Action {
         })
         .promise()
     } catch (err) {
+      winston.error("Encountered an error in trackLookerAction, error: " + getErrorMessage(err))
       // swallow any errors in the track call
       return
     }
