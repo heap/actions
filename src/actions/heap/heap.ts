@@ -1,15 +1,14 @@
 import * as req from "request-promise-native"
+import * as semver from "semver"
 import * as winston from "winston"
 
 import * as Hub from "../../hub"
 
-export enum HeapPropertyTypes {
-  User = "user",
-  Account = "account",
+export type HeapPropertyType = "user" | "account"
+export const HEAP_PROPERTY_TYPES: { [name: string]: HeapPropertyType }  = {
+  User: "user",
+  Account: "account",
 }
-export type HeapPropertyType =
-  | HeapPropertyTypes.Account
-  | HeapPropertyTypes.User
 
 // HeapFields enumerates supported identifiers for each endpoint
 // - "identity" is the user identifier for the user properties export
@@ -39,11 +38,11 @@ interface HeapEntity {
   properties: PropertyMap
 }
 
-function getErrorMessage(error: unknown) {
-  if (!error || !(error as Error).message) {
-    return '';
+function getErrorMessage(error: unknown): string {
+  if (!(error as string) || !(error as Error).message) {
+    return ""
   }
-  return (error as Error).message;
+  return error as string || (error as Error).message
 }
 
 export class HeapAction extends Hub.Action {
@@ -60,16 +59,23 @@ export class HeapAction extends Hub.Action {
   static HEAP_EVENT_NAME = "Submit Looker Action"
   static LOG_PROGRESS_STEP = 10000
   static DISPLAY_ERROR_COUNT = 250
+  static EMPTY_HEAP_ENTITY = { heapFieldValue: undefined, properties: {} }
+  static SUPPORTED_PROPERTY_TYPES: string[] = [HEAP_PROPERTY_TYPES.User, HEAP_PROPERTY_TYPES.Account]
 
-  emptyHeapEntity = { heapFieldValue: undefined, properties: {} }
   description = "Add user and account properties to your Heap dataset"
   label = "Heap"
   iconName = "heap/heap.svg"
   name = "heap"
   params = []
   supportedActionTypes = [Hub.ActionType.Query]
-  supportedPropertyTypes = [HeapPropertyTypes.User, HeapPropertyTypes.Account]
   usesStreaming = true
+  supportedFormats = (request: Hub.ActionRequest) => {
+    if (request.lookerVersion && semver.gte(request.lookerVersion, "6.2.0")) {
+      return [Hub.ActionFormat.JsonDetailLiteStream]
+    } else {
+      return [Hub.ActionFormat.JsonDetail]
+    }
+  }
 
   async execute(request: Hub.ActionRequest): Promise<Hub.ActionResponse> {
     const maybeValidationError = this.validateParams(request.formParams)
@@ -112,9 +118,12 @@ export class HeapAction extends Hub.Action {
         identityField = this.extractHeapFieldByLabel(allFields, heapFieldLabel, errors)
         winston.debug(`envId ${envId} heapFieldName ${identityField} heapFieldLabel ${heapFieldLabel}`, logTag)
         fieldMap = this.extractFieldMap(allFields)
-        winston.info(`envId ${envId} fieldMap ${JSON.stringify(fieldMap)}`, logTag)
+        winston.debug(`envId ${envId} fieldMap ${JSON.stringify(fieldMap)}`, logTag)
       },
       onRow: (row) => {
+        if (!identityField) {
+          return
+        }
         if (rowsReceived % HeapAction.LOG_PROGRESS_STEP === 0) {
           winston.info(`Example row for envId ${envId} ${JSON.stringify(row)}`, logTag)
         }
@@ -122,7 +131,7 @@ export class HeapAction extends Hub.Action {
         try {
           const { heapFieldValue, properties } = this.extractPropertiesFromRow(
             row,
-            identityField!,
+            identityField,
             fieldMap,
             logTag,
           )
@@ -154,23 +163,22 @@ export class HeapAction extends Hub.Action {
             }
           }
         } catch (err) {
-          errors.push(new Error("Encountered an error onRow, error: " + getErrorMessage(err)))
+          errors.push(new Error("Encountered an error onRow: " + getErrorMessage(err)))
         }
       },
     })
 
     try {
-      const length = requestPromises.length
+      let length = requestBatch.length
+      if (length > 0) {
+        winston.info(`Loading the remaining ${length} rows of data to heap`, logTag)
+        requestPromises.push(this.sendRequest(requestBatch, envId, requestUrl, heapField, errors))
+      }
+      length = requestPromises.length
       winston.info(`Confirming all ${length} requests are resolved`, logTag)
       await Promise.all(requestPromises)
     } catch (err) {
-      errors.push(new Error("Encountered an error in execute, error: " + getErrorMessage(err)))
-    }
-
-    if (requestBatch.length > 0) {
-      const length = requestBatch.length
-      winston.info(`Loading the remaining ${length} rows of data to heap`, logTag)
-      await this.sendRequest(requestBatch, envId, requestUrl, heapField, errors)
+      errors.push(new Error("Encountered an error in executing promises: " + getErrorMessage(err)))
     }
 
     try {
@@ -233,8 +241,8 @@ export class HeapAction extends Hub.Action {
         name: "property_type",
         required: true,
         options: [
-          { name: HeapPropertyTypes.Account, label: "Account" },
-          { name: HeapPropertyTypes.User, label: "User" },
+          { name: HEAP_PROPERTY_TYPES.Account, label: "Account" },
+          { name: HEAP_PROPERTY_TYPES.User, label: "User" },
         ],
         type: "select",
       },
@@ -263,7 +271,7 @@ export class HeapAction extends Hub.Action {
 
     if (
       !formParams.property_type ||
-      !(this.supportedPropertyTypes as string[]).includes(
+      !(HeapAction.SUPPORTED_PROPERTY_TYPES).includes(
         formParams.property_type,
       )
     ) {
@@ -309,9 +317,9 @@ export class HeapAction extends Hub.Action {
 
   private resolveHeapField(propertyType: HeapPropertyType, logTag: LogTag): HeapField {
     switch (propertyType) {
-      case HeapPropertyTypes.Account:
+      case HEAP_PROPERTY_TYPES.Account:
         return HeapFields.AccountId
-      case HeapPropertyTypes.User:
+      case HEAP_PROPERTY_TYPES.User:
         return HeapFields.Identity
       default:
         const error = new Error(`Unsupported property type: ${propertyType}`)
@@ -322,9 +330,9 @@ export class HeapAction extends Hub.Action {
 
   private resolveApiEndpoint(propertyType: HeapPropertyType, logTag: LogTag): string {
     switch (propertyType) {
-      case HeapPropertyTypes.User:
+      case HEAP_PROPERTY_TYPES.User:
         return HeapAction.ADD_USER_PROPERTIES_URL
-      case HeapPropertyTypes.Account:
+      case HEAP_PROPERTY_TYPES.Account:
         return HeapAction.ADD_ACCOUNT_PROPERTIES_URL
       default:
         const error = new Error(`Unsupported property type: ${propertyType}`)
@@ -339,30 +347,21 @@ export class HeapAction extends Hub.Action {
     ): {
       key: string,
       value: string,
-      success: boolean,
-      error?: string,
     } {
     // we have observed different behavior based on how the view is created
     // each of the following could potentially be used as keys of the field,
     // so we check each one until we find one that exists.
     const propertiesToCheck = [field.name, field.label_short, field.field_group_label]
     const fieldName = propertiesToCheck.find((f) => !!f && row.hasOwnProperty(f))
-    if (fieldName) {
-     const value = row[fieldName].value != null ? row[fieldName].value.toString() : ""
+    if (fieldName && !!row[fieldName].value) {
      return {
         key: fieldName,
-        value,
-        success: true,
+        value: row[fieldName].value.toString(),
       }
     } else {
       const heapFieldDesc = `${JSON.stringify(propertiesToCheck)}`
-      return {
-        key: "",
-        value: "",
-        success: false,
-        error: `Found a row without the ${heapFieldDesc} field or value on the field is empty. ` +
-          `row: ${JSON.stringify(row)}`,
-      }
+      throw new Error(`Found a row without the ${heapFieldDesc} field or the value is empty. ` +
+        `row: ${JSON.stringify(row)}`)
     }
   }
 
@@ -379,11 +378,8 @@ export class HeapAction extends Hub.Action {
     heapFieldValue: string | undefined;
     properties: PropertyMap;
   } {
-    const identityFieldValue = this.extractRequiredField(row, identityField)
-    if (!identityFieldValue.success) {
-      return this.emptyHeapEntity
-    }
     try {
+      const identityFieldValue = this.extractRequiredField(row, identityField)
       const heapFieldValue = identityFieldValue.value
 
       const properties: { [K in string]: string } = {}
@@ -411,7 +407,7 @@ export class HeapAction extends Hub.Action {
         error: getErrorMessage(err),
         row,
       })
-      return this.emptyHeapEntity
+      return HeapAction.EMPTY_HEAP_ENTITY
     }
   }
 
@@ -501,7 +497,7 @@ export class HeapAction extends Hub.Action {
         })
         .promise()
     } catch (err) {
-      winston.error("Encountered an error in trackLookerAction, error: " + getErrorMessage(err))
+      winston.error("Encountered an error in trackLookerAction: " + getErrorMessage(err))
       // swallow any errors in the track call
       return
     }

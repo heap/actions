@@ -5,11 +5,11 @@ import * as sinon from "sinon"
 import * as Hub from "../../../src/hub"
 
 import {
+  HEAP_PROPERTY_TYPES,
   HeapAction,
   HeapField,
   HeapFields,
   HeapPropertyType,
-  HeapPropertyTypes,
 } from "./heap"
 
 const action = new HeapAction()
@@ -122,7 +122,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const fields = [{ name: "email", label: "Email" }]
       const data = [{ email: { value: "value1" } }]
       const request = buildRequest(
-        HeapPropertyTypes.User,
+        HEAP_PROPERTY_TYPES.User,
         "Email",
         fields,
         data,
@@ -142,7 +142,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const fields = [{ name: "email", label: "Email" }]
       const data = [{ email: { value: "value1" } }]
       const request = buildRequest(
-        HeapPropertyTypes.User,
+        HEAP_PROPERTY_TYPES.User,
         "Email",
         fields,
         data,
@@ -161,7 +161,7 @@ describe(`${action.constructor.name} unit tests`, () => {
     it("should fail when Heap field column is not provided", async () => {
       const fields = [{ name: "email", label: "Email" }]
       const data = [{ email: { value: "value1" } }]
-      const request = buildRequest(HeapPropertyTypes.User, "", fields, data)
+      const request = buildRequest(HEAP_PROPERTY_TYPES.User, "", fields, data)
 
       const response = await action.validateAndExecute(request)
 
@@ -193,25 +193,25 @@ describe(`${action.constructor.name} unit tests`, () => {
       const fields = [{ name: "name", label: "label" }]
       const data = [{ name: { value: "value1" } }]
       const request = buildRequest(
-        HeapPropertyTypes.User,
+        HEAP_PROPERTY_TYPES.User,
         "Email",
         fields,
         data,
       )
-
-      chai
-        .expect(action.validateAndExecute(request))
-        .to.be.eventually.rejectedWith(
-          "Heap field (Email) is missing in the query result.",
-        )
-      chai.expect(stubPost).to.have.not.been.called
+      const response = await action.validateAndExecute(request)
+      chai.expect(response.success).to.equal(false)
+      chai.expect(response.message).to.contain(
+        "Heap action for envId 1 failed with 1 errors  - Heap field (Email) is missing in the query result."
+      )
+      chai.expect(stubPost).to.have.been.calledOnce
+      expectHeapTrackRequest(HeapFields.Identity, 0, "failure", 0)
     })
 
     it("should skip rows with null heap field", async () => {
       const fields = [{ name: "email", label: "Email" }]
       const data = [{ email: { value: null } }]
       const request = buildRequest(
-        HeapPropertyTypes.User,
+        HEAP_PROPERTY_TYPES.User,
         "Email",
         fields,
         data,
@@ -245,7 +245,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         },
       ]
       const request = buildRequest(
-        HeapPropertyTypes.User,
+        HEAP_PROPERTY_TYPES.User,
         "Email",
         fields,
         data,
@@ -295,7 +295,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         },
       ]
       const request = buildRequest(
-        HeapPropertyTypes.Account,
+        HEAP_PROPERTY_TYPES.Account,
         "Account ID",
         fields,
         data,
@@ -341,7 +341,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       ]
 
       const request = buildRequest(
-        HeapPropertyTypes.Account,
+        HEAP_PROPERTY_TYPES.Account,
         "Account ID",
         fields,
         data,
@@ -374,7 +374,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       }))
 
       const request = buildRequest(
-        HeapPropertyTypes.Account,
+        HEAP_PROPERTY_TYPES.Account,
         "Account ID",
         fields,
         data,
@@ -415,7 +415,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         },
       ]
       const request = buildRequest(
-        HeapPropertyTypes.Account,
+        HEAP_PROPERTY_TYPES.Account,
         "Account ID",
         fields,
         data,
