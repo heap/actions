@@ -201,7 +201,7 @@ describe(`${action.constructor.name} unit tests`, () => {
       const response = await action.validateAndExecute(request)
       chai.expect(response.success).to.equal(false)
       chai.expect(response.message).to.contain(
-        "Heap action for envId 1 failed with 1 errors  - Heap field (Email) is missing in the query result."
+        "Heap field (Email) is missing in the query result."
       )
       chai.expect(stubPost).to.have.been.calledOnce
       expectHeapTrackRequest(HeapFields.Identity, 0, "failure", 0)

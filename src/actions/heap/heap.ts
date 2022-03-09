@@ -112,13 +112,17 @@ export class HeapAction extends Hub.Action {
 
     await request.streamJsonDetail({
       onFields: (fieldset) => {
-        winston.debug(`envId ${envId} fieldset ${JSON.stringify(fieldset)}`, logTag)
-        const allFields = Hub.allFields(fieldset)
-        winston.debug(`envId ${envId} allFields ${JSON.stringify(allFields)}`, logTag)
-        identityField = this.extractHeapFieldByLabel(allFields, heapFieldLabel, errors)
-        winston.debug(`envId ${envId} heapFieldName ${identityField} heapFieldLabel ${heapFieldLabel}`, logTag)
-        fieldMap = this.extractFieldMap(allFields)
-        winston.debug(`envId ${envId} fieldMap ${JSON.stringify(fieldMap)}`, logTag)
+        try {
+          winston.debug(`envId ${envId} fieldset ${JSON.stringify(fieldset)}`, logTag)
+          const allFields = Hub.allFields(fieldset)
+          winston.debug(`envId ${envId} allFields ${JSON.stringify(allFields)}`, logTag)
+          identityField = this.extractHeapFieldByLabel(allFields, heapFieldLabel)
+          winston.debug(`envId ${envId} heapFieldName ${identityField} heapFieldLabel ${heapFieldLabel}`, logTag)
+          fieldMap = this.extractFieldMap(allFields)
+          winston.debug(`envId ${envId} fieldMap ${JSON.stringify(fieldMap)}`, logTag)
+        } catch(err) {
+          errors.push(new Error('Encountered errors in processing fields: ' + getErrorMessage(err)))
+        }
       },
       onRow: (row) => {
         if (!identityField) {
@@ -288,14 +292,12 @@ export class HeapAction extends Hub.Action {
     }
   }
 
-  private extractHeapFieldByLabel(fields: Hub.Field[], heapFieldLabel: string, errors: Error[]): Hub.Field | undefined {
+  private extractHeapFieldByLabel(fields: Hub.Field[], heapFieldLabel: string): Hub.Field | undefined {
     const heapField = fields.find((field) => field.label === heapFieldLabel)
     if (!heapField) {
-      const error = new Error(
+      throw new Error(
         `Heap field (${heapFieldLabel}) is missing in the query result.`,
       )
-      errors.push(error)
-      return undefined
     }
     return heapField
   }
