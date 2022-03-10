@@ -228,19 +228,17 @@ export class HeapAction extends Hub.Action {
 
   /*
   * define the instance properties for the connection to Heap. Form.fields will generate UI in looker.
-  * Here we defined 3 fields, the initial input is stored in request.params, validation is run here
+  * Here we defined 3 fields:
   *   - a text box for env_id
   *   - a dropdown for property_type
   *   - a text box for heap_field
   */
   async form(request: Hub.ActionRequest) {
     const form = new Hub.ActionForm()
-    const error = this.validateParams(request.params)
-    if (error) {
-      winston.error(error.message)
-      form.error = error.message
-      return form
-    }
+    winston.info('New connection is being setup', {
+      formParams: request.formParams,
+      params: request.params
+    });
     form.fields = [
       {
         label: "Heap Environment ID",
