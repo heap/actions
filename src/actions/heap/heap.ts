@@ -91,10 +91,11 @@ export class HeapAction extends Hub.Action {
   }
 
   async execute(request: Hub.ActionRequest): Promise<Hub.ActionResponse> {
-    const maybeValidationError = this.validateParams(request.formParams)
-    if (!!maybeValidationError) {
+    const validationResult = this.validateParams(request.formParams)
+    if (!!validationResult) {
+      const { validationError, error } = validationResult;
       logger.error(
-        `Heap action failed with an error: ${maybeValidationError.message}`,
+        `Heap action failed with an error: ${error.message}`,
         {
           webhookId: request.webhookId,
           ...request.formParams,
@@ -102,7 +103,8 @@ export class HeapAction extends Hub.Action {
       )
       return new Hub.ActionResponse({
         success: false,
-        message: maybeValidationError.message,
+        validationErrors: [validationError],
+        message: error.message,
       })
     }
 
@@ -284,11 +286,19 @@ export class HeapAction extends Hub.Action {
   * The validation will be run when a field is received (for backward compatibility)
   * The same validation will be when the connection is initially setup.
   */
-  private validateParams(formParams: Hub.ParamMap): Error | undefined {
+  private validateParams(formParams: Hub.ParamMap): {
+    validationError: Hub.ValidationError,
+    error: Error
+  } | undefined {
     if (!formParams.env_id || formParams.env_id.match(/\D/g)) {
-      return new Error(
-        `Heap environment ID is invalid: ${formParams.env_id}`,
-      )
+      const message = `Heap environment ID is invalid: ${formParams.env_id}`;
+      return {
+        validationError: {
+          field: 'env_id',
+          message,
+        },
+        error: new Error(message),
+      }
     }
 
     if (
@@ -297,16 +307,28 @@ export class HeapAction extends Hub.Action {
         formParams.property_type,
       )
     ) {
-      return new Error(
-        `Unsupported property type: ${formParams.property_type}`,
-      )
+      const message = `Unsupported property type: ${formParams.property_type}`
+      return {
+        validationError: {
+          field: 'property_type',
+          message,
+        },
+        error: new Error(message),
+      }
     }
 
     if (
       !formParams.heap_field ||
       formParams.heap_field.length === 0
     ) {
-      return new Error("Column mapping to a Heap field must be provided.")
+      const message = "Column mapping to a Heap field must be provided."
+      return {
+        validationError: {
+          field: 'heap_field',
+          message,
+        },
+        error: new Error(message),
+      }
     }
   }
 
