@@ -93,13 +93,13 @@ export class HeapAction extends Hub.Action {
   async execute(request: Hub.ActionRequest): Promise<Hub.ActionResponse> {
     const validationResult = this.validateParams(request.formParams)
     if (!!validationResult) {
-      const { validationError, error } = validationResult;
+      const { validationError, error } = validationResult
       logger.error(
         `Heap action failed with an error: ${error.message}`,
         {
           webhookId: request.webhookId,
           ...request.formParams,
-        }
+        },
       )
       return new Hub.ActionResponse({
         success: false,
@@ -288,13 +288,13 @@ export class HeapAction extends Hub.Action {
   */
   private validateParams(formParams: Hub.ParamMap): {
     validationError: Hub.ValidationError,
-    error: Error
+    error: Error,
   } | undefined {
     if (!formParams.env_id || formParams.env_id.match(/\D/g)) {
-      const message = `Heap environment ID is invalid: ${formParams.env_id}`;
+      const message = `Heap environment ID is invalid: ${formParams.env_id}`
       return {
         validationError: {
-          field: 'env_id',
+          field: "env_id",
           message,
         },
         error: new Error(message),
@@ -310,7 +310,7 @@ export class HeapAction extends Hub.Action {
       const message = `Unsupported property type: ${formParams.property_type}`
       return {
         validationError: {
-          field: 'property_type',
+          field: "property_type",
           message,
         },
         error: new Error(message),
@@ -324,7 +324,7 @@ export class HeapAction extends Hub.Action {
       const message = "Column mapping to a Heap field must be provided."
       return {
         validationError: {
-          field: 'heap_field',
+          field: "heap_field",
           message,
         },
         error: new Error(message),
