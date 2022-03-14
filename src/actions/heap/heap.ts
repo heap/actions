@@ -72,7 +72,7 @@ export class HeapAction extends Hub.Action {
   static HEAP_EVENT_NAME = "Submit Looker Action"
   static LOG_PROGRESS_STEP = 10000
   static DISPLAY_ERROR_COUNT = 250
-  static EMPTY_HEAP_ENTITY = {heapFieldValue: undefined, properties: {}}
+  static EMPTY_HEAP_ENTITY = { heapFieldValue: undefined, properties: {} }
   static SUPPORTED_PROPERTY_TYPES: string[] = [HEAP_PROPERTY_TYPES.User, HEAP_PROPERTY_TYPES.Account]
 
   description = "Add user and account properties to your Heap dataset"
@@ -126,7 +126,7 @@ export class HeapAction extends Hub.Action {
       heapField = this.resolveHeapField(propertyType, logTag)
       requestUrl = this.resolveApiEndpoint(propertyType, logTag)
     } catch (err) {
-      logger.error("Error in preflight resolvers", {...logTag, err})
+      logger.error("Error in preflight resolvers", { ...logTag, err })
       return new Hub.ActionResponse({
         success: false,
         message: getErrorMessage(err),
@@ -146,7 +146,7 @@ export class HeapAction extends Hub.Action {
             const allFields = Hub.allFields(fieldset)
             logger.debug(`envId ${envId} allFields ${JSON.stringify(allFields)}`, logTag)
             identityField = this.extractHeapFieldByLabel(allFields, heapFieldLabel)
-            logger.debug(`envId ${envId} identityField`, {...logTag, identityField, heapFieldLabel})
+            logger.debug(`envId ${envId} identityField`, { ...logTag, identityField, heapFieldLabel })
             fieldMap = this.extractFieldMap(allFields)
             logger.debug(`envId ${envId} fieldMap ${JSON.stringify(fieldMap)}`, logTag)
           } catch (err) {
@@ -202,7 +202,7 @@ export class HeapAction extends Hub.Action {
         },
       })
     } catch (err) {
-      logger.error("Error in request.streamJsonDetail", {err, ...logTag})
+      logger.error("Error in request.streamJsonDetail", { err, ...logTag })
       syncErrors.push(err)
     }
 
@@ -235,7 +235,7 @@ export class HeapAction extends Hub.Action {
     }
 
     if (syncErrors.length === 0) {
-      return new Hub.ActionResponse({success: true})
+      return new Hub.ActionResponse({ success: true })
     } else {
       // limit error message to the first N to avoid returning enormous error messages
       // (arbitrary limit)
@@ -276,8 +276,8 @@ export class HeapAction extends Hub.Action {
         name: "property_type",
         required: true,
         options: [
-          {name: HEAP_PROPERTY_TYPES.Account, label: "Account"},
-          {name: HEAP_PROPERTY_TYPES.User, label: "User"},
+          { name: HEAP_PROPERTY_TYPES.Account, label: "Account" },
+          { name: HEAP_PROPERTY_TYPES.User, label: "User" },
         ],
         type: "select",
       },
@@ -538,12 +538,12 @@ export class HeapAction extends Hub.Action {
       await req
         .post({
           uri: HeapAction.HEAP_TRACK_URL,
-          headers: {"Content-Type": "application/json"},
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         })
         .promise()
     } catch (err) {
-      logger.error(`Encountered an error in trackLookerAction: ${getErrorMessage(err)}`, {envId, webhookId})
+      logger.error(`Encountered an error in trackLookerAction: ${getErrorMessage(err)}`, { envId, webhookId })
       // swallow any errors in the track call
       return
     }
