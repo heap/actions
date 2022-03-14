@@ -51,13 +51,6 @@ interface HeapEntity {
   properties: PropertyMap
 }
 
-function getErrorMessage(error: unknown): string {
-  if (!(error as string) || !(error as Error).message) {
-    return ""
-  }
-  return error as string || (error as Error).message
-}
-
 export class HeapAction extends Hub.Action {
   static ADD_USER_PROPERTIES_URL =
     "https://heapanalytics.com/api/integrations/add_user_properties"
@@ -91,8 +84,9 @@ export class HeapAction extends Hub.Action {
   }
 
   async execute(request: Hub.ActionRequest): Promise<Hub.ActionResponse> {
-    const validationError = this.validateParams(request.formParams)
-    if (!!validationError) {
+    try {
+      this.validateParams(request.formParams)
+    } catch (validationError) {
       logger.error(
         `Heap action failed with an error`,
         {
@@ -129,7 +123,7 @@ export class HeapAction extends Hub.Action {
       logger.error("Error in preflight resolvers", { ...logTag, err })
       return new Hub.ActionResponse({
         success: false,
-        message: getErrorMessage(err),
+        message: err.message,
       })
     }
     const syncErrors: Error[] = []
@@ -248,7 +242,7 @@ export class HeapAction extends Hub.Action {
         logger.error(errorDesc, logTag)
       }
       // log first N errors
-      errorsToDisplay.forEach((err) => logger.error(`envId ${envId} error: ${err.message}`, logTag))
+      errorsToDisplay.forEach((err) => logger.error(`envId ${envId} error: ${err.message}`, { ...logTag, err }))
       // concat first N errors into a signle errorMsg to return to the looker action hub.
       const errorMsg = errorsToDisplay.map((err) => err.message).join(", ")
       return new Hub.ActionResponse({ success: false, message: `${errorDesc} - ${errorMsg}` })
@@ -297,10 +291,10 @@ export class HeapAction extends Hub.Action {
   * The validation will be run when a field is received (for backward compatibility)
   * The same validation will be when the connection is initially setup.
   */
-  private validateParams(formParams: Hub.ParamMap): Hub.ValidationError | undefined {
+  private validateParams(formParams: Hub.ParamMap) {
     if (!formParams.env_id || formParams.env_id.match(/\D/g)) {
       const message = `Heap environment ID is invalid: ${formParams.env_id}`
-      return {
+      throw {
         field: "env_id",
         message,
       }
@@ -313,7 +307,7 @@ export class HeapAction extends Hub.Action {
       )
     ) {
       const message = `Unsupported property type: ${formParams.property_type}`
-      return {
+      throw {
         field: "property_type",
         message,
       }
@@ -324,7 +318,7 @@ export class HeapAction extends Hub.Action {
       formParams.heap_field.length === 0
     ) {
       const message = "Column mapping to a Heap field must be provided."
-      return {
+      throw {
         field: "heap_field",
         message,
       }
@@ -445,7 +439,7 @@ export class HeapAction extends Hub.Action {
     } catch (err) {
       logger.error("Encountered an error in heapify, skip the row", {
         ...logTag,
-        error: getErrorMessage(err),
+        err,
         row,
       })
       return HeapAction.EMPTY_HEAP_ENTITY
@@ -499,9 +493,9 @@ export class HeapAction extends Hub.Action {
         })
         .promise()
     } catch (err) {
-      const errorMsg = `Encountered an error in sending request to heap, error: ${getErrorMessage(err)}`
-      logger.error(errorMsg, logTag)
-      errors.push(new Error(errorMsg))
+      const errorMsg = `Encountered an error in sending request to heap`
+      logger.error(errorMsg, { ...logTag, err })
+      errors.push(err)
     }
   }
 
@@ -543,7 +537,7 @@ export class HeapAction extends Hub.Action {
         })
         .promise()
     } catch (err) {
-      logger.error(`Encountered an error in trackLookerAction: ${getErrorMessage(err)}`, { envId, webhookId })
+      logger.error(`Encountered an error in trackLookerAction`, { envId, webhookId, err })
       // swallow any errors in the track call
       return
     }
