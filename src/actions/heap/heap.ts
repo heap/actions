@@ -161,6 +161,7 @@ export class HeapAction extends Hub.Action {
               logTag,
             )
             if (!heapFieldValue) {
+              logger.debug("Missing heapFieldValue", row)
               // if heapFieldValue or heapFieldValue is empty, onRow ends early
               return
             }
