@@ -58,7 +58,7 @@ export class HeapAction extends Hub.Action {
     "https://heapanalytics.com/api/add_account_properties"
   static HEAP_TRACK_URL = "https://heapanalytics.com/api/track"
   static HEAP_LIBRARY = "looker"
-  static ROWS_PER_BATCH = 1000
+  static ROWS_PER_BATCH = 100
   // TODO: remove me before GA
   static HEAP_ENV_ID = process.env.HEAP_ENV_ID
   static HEAP_IDENTITY = process.env.HEAP_IDENTITY
