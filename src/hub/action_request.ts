@@ -186,7 +186,7 @@ export class ActionRequest {
 
     const streamPromise = new Promise<void>((resolve, reject) => {
       if (url) {
-        winston.info(`[stream] beginning stream via download url`, this.logInfo)
+        winston.info(`[stream] beginning stream via download url: ${url}`, this.logInfo)
         let hasResolved = false
         httpRequest
           .get(url, {timeout})
