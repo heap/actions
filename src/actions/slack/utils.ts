@@ -1,4 +1,5 @@
-import {WebClient} from "@slack/client"
+import {WebClient} from "@slack/web-api"
+import * as gaxios from "gaxios"
 import * as winston from "winston"
 import * as Hub from "../../hub"
 import {ActionFormField} from "../../hub"
@@ -16,7 +17,6 @@ const _usableChannels = async (slack: WebClient): Promise<Channel[]> => {
         exclude_archived: true,
         limit: API_LIMIT_SIZE,
     }
-    const channelList: any = slack.conversations.list
     const pageLoaded = async (accumulatedChannels: any[], response: any): Promise<any[]> => {
         const mergedChannels = accumulatedChannels.concat(response.channels)
 
@@ -26,12 +26,13 @@ const _usableChannels = async (slack: WebClient): Promise<Channel[]> => {
             response.response_metadata.next_cursor !== "") {
             const pageOptions = { ...options }
             pageOptions.cursor = response.response_metadata.next_cursor
-            return pageLoaded(mergedChannels, await channelList(pageOptions))
+            return pageLoaded(mergedChannels, await slack.conversations.list(pageOptions))
         }
         return mergedChannels
     }
-    const paginatedChannels = await pageLoaded([], await channelList(options))
-    const channels = paginatedChannels.filter((c: any) => c.is_member && !c.is_archived)
+    const channelsInit = await slack.conversations.list(options)
+    const paginatedChannels = await pageLoaded([], channelsInit)
+    const channels = paginatedChannels.filter((c: any) => !c.is_archived)
     return channels.map((channel: any) => ({id: channel.id, label: `#${channel.name}`}))
 }
 
@@ -59,16 +60,24 @@ const usableDMs = async (slack: WebClient): Promise<Channel[]> => {
     return users.map((user: any) => ({id: user.id, label: `@${user.name}`}))
 }
 
-const usableChannels = async (slack: WebClient): Promise<Channel[]> => {
-    let channels = await _usableChannels(slack)
-    channels = channels.concat(await usableDMs(slack))
+export const getDisplayedFormFields = async (slack: WebClient, channelType: string): Promise<ActionFormField[]> => {
+    let channels
+    if (channelType === "channels") {
+        channels = await _usableChannels(slack)
+    } else {
+        channels = await usableDMs(slack)
+    }
     channels.sort((a, b) => ((a.label < b.label) ? -1 : 1 ))
-    return channels
-}
-
-export const getDisplayedFormFields = async (slack: WebClient): Promise<ActionFormField[]> => {
-    const channels = await usableChannels(slack)
     return [
+        {
+            description: "Type of destination to fetch",
+            label: "Channel Type",
+            name: "channelType",
+            options: [{name: "channels", label: "Channels"}, {name: "users", label: "Users"}],
+            type: "select",
+            default: "channels",
+            interactive: true,
+        },
         {
             description: "Name of the Slack channel you would like to post to.",
             label: "Share In",
@@ -93,27 +102,92 @@ export const handleExecute = async (request: Hub.ActionRequest, slack: WebClient
         throw "Missing channel."
     }
 
+    const webhookId = request.webhookId
     const fileName = request.formParams.filename  ? request.completeFilename() : request.suggestedFilename()
 
     let response = new Hub.ActionResponse({success: true})
     try {
+        const isUserToken = request.formParams.channel.startsWith("U")
+        const forceV1Upload = process.env.FORCE_V1_UPLOAD
         if (!request.empty()) {
+            const buffs: any[] = []
             await request.stream(async (readable) => {
-                await slack.files.upload({
-                    file: readable,
-                    filename: fileName,
-                    channels: request.formParams.channel,
-                    initial_comment: request.formParams.initial_comment ? request.formParams.initial_comment : "",
+                // Slack API Upload flow. Get an Upload URL from slack
+                await new Promise<void>((resolve, reject) => {
+                    readable.on("readable", () => {
+                        let buff = readable.read()
+                        while (buff) {
+                            buffs.push(buff)
+                            buff = readable.read()
+                        }
+                    })
+                    readable.on("end", async () => {
+                        const buffer = Buffer.concat(buffs)
+                        const comment = request.formParams.initial_comment ? request.formParams.initial_comment : ""
+                        winston.info(`Attempting to send ${buffer.byteLength} bytes to Slack`, {webhookId})
+
+                        // Unfortunately UploadV2 does not provide a way to upload files
+                        // to user tokens which are common in Looker schedules
+                        // (UXXXXXXX)
+                        if (isUserToken || forceV1Upload) {
+                            winston.info(`V1 Upload of file`, {webhookId})
+                            await slack.files.upload({
+                                file: buffer,
+                                filename: fileName,
+                                channels: request.formParams.channel,
+                                initial_comment: comment,
+                            })
+                        } else {
+                            winston.info(`V2 Upload of file`, {webhookId})
+                            const res = await slack.files.getUploadURLExternal({
+                                filename: fileName,
+                                length: buffer.byteLength,
+                            })
+                            const upload_url = res.upload_url
+
+                            // Upload file to Slack
+                            await gaxios.request({
+                                method: "POST",
+                                url: upload_url,
+                                data: buffer,
+                            })
+
+                            // Finalize upload and give metadata for channel, title and
+                            // comment for the file to be posted.
+                            await slack.files.completeUploadExternal({
+                                files: [{
+                                    id: res.file_id ? res.file_id : "",
+                                    title: fileName,
+                                }],
+                                channel_id: request.formParams.channel,
+                            }).catch((e: any) => {
+                                reject(e)
+                            })
+                            // Workaround for regression in V2 upload, the initial
+                            // comment does not support markdown formatting, breaking
+                            // customer links
+                            if (comment !== "") {
+                                await slack.chat.postMessage({
+                                    channel: request.formParams.channel!,
+                                    text: comment,
+                                }).catch((e: any) => {
+                                    reject(e)
+                                })
+                            }
+                        }
+                        resolve()
+                    })
                 })
             })
         } else {
-            winston.info("No data to upload. Sending message instead")
+            winston.info("No data to upload. Sending message instead", {webhookId})
             await slack.chat.postMessage({
                 channel: request.formParams.channel,
                 text: request.formParams.initial_comment ? request.formParams.initial_comment : "",
             })
         }
-    } catch (e) {
+    } catch (e: any) {
+        winston.info(`Error: ${e.message}`)
         response = new Hub.ActionResponse({success: false, message: e.message})
     }
     return response

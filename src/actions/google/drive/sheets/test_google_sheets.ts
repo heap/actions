@@ -396,6 +396,13 @@ describe(`${action.constructor.name} unit tests`, () => {
       })
     })
 
+    describe("sanitizeFilename", () => {
+      it("will sanitize apostrophe in filename", () => {
+        const filename = "Barbara'sFile.csv"
+        chai.expect(action.sanitizeFilename(filename)).to.equal("Barbara\'sFile.csv")
+      })
+    })
+
     describe("flush", () => {
       it("will retry if a 429 code is received", (done) => {
         const retrySpy = sinon.spy()
@@ -424,7 +431,7 @@ describe(`${action.constructor.name} unit tests`, () => {
           },
         }
         // @ts-ignore
-        chai.expect(action.flush({}, sheet , "0")).to.eventually.be.fulfilled.then( () => {
+        chai.expect(action.flush({}, sheet , "0")).to.eventually.be.rejectedWith({code: 500}).then( () => {
           chai.expect(retryStub).to.have.callCount(0)
           retryStub.restore()
           done()
@@ -441,7 +448,7 @@ describe(`${action.constructor.name} unit tests`, () => {
           },
         }
         // @ts-ignore
-        chai.expect(action.flush({}, sheet , "0")).to.eventually.be.fulfilled.then( () => {
+        chai.expect(action.flush({}, sheet , "0")).to.eventually.be.rejectedWith({code: 500}).then( () => {
           chai.expect(retryStub).to.have.callCount(0)
           retryStub.restore()
           done()
@@ -456,13 +463,16 @@ describe(`${action.constructor.name} unit tests`, () => {
         const spreadSheetsStub = {
           batchUpdate: async () => Promise.resolve(),
         }
-        const batchUpdateStub = sinon.stub(spreadSheetsStub, "batchUpdate").rejects({code: 429})
+        const batchUpdateCallSpy = sinon.spy(async () => { throw {code: 429}})
+        const batchUpdateStub = sinon.stub(spreadSheetsStub, "batchUpdate")
+            .callsFake(batchUpdateCallSpy)
 
         const sheet = {
           spreadsheets: spreadSheetsStub,
         }
         // @ts-ignore
-        chai.expect(action.flushRetry({}, sheet , "0")).to.eventually.be.fulfilled.then( () => {
+        chai.expect(action.flushRetry({}, sheet , "0")).to.eventually.be.rejectedWith("Max retries attempted")
+            .then( () => {
           chai.expect(batchUpdateStub).to.have.callCount(5)
           chai.expect(delayStub).to.have.been.calledWith(3000)
           chai.expect(delayStub).to.have.been.calledWith(9000)
@@ -475,7 +485,7 @@ describe(`${action.constructor.name} unit tests`, () => {
         })
       })
 
-      it("will only retry if a 429 code is recieved", (done) => {
+      it("will only retry if a 429 code is received", (done) => {
         const delayStub = sinon.stub(action as any, "delay")
 
         const spreadSheetsStub = {
@@ -487,7 +497,7 @@ describe(`${action.constructor.name} unit tests`, () => {
           spreadsheets: spreadSheetsStub,
         }
         // @ts-ignore
-        chai.expect(action.flushRetry({}, sheet , "0")).to.eventually.be.fulfilled.then( () => {
+        chai.expect(action.flushRetry({}, sheet , "0")).to.eventually.be.rejectedWith({code: 500}).then( () => {
           chai.expect(batchUpdateStub).to.have.callCount(1)
           chai.expect(delayStub).to.have.been.calledWith(3000)
           batchUpdateStub.restore()
@@ -576,6 +586,15 @@ describe(`${action.constructor.name} unit tests`, () => {
             data: JSON.stringify({tokens: "access", redirect: "url"}),
           },
         }).and.notify(stubClient.restore).and.notify(done)
+      })
+    })
+
+    describe("mimeType", () => {
+      it("uses the action mimeType if it exists", () => {
+        const request = new Hub.ActionRequest()
+        request.attachment = {mime: "foo"}
+        request.formParams = {format: "bar"}
+        chai.expect(action.getMimeType(request)).to.equal("application/vnd.google-apps.spreadsheet")
       })
     })
   })
